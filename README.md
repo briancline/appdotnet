@@ -15,7 +15,7 @@ And lo, the hacks were shameful, and were not to be spoken of or whatever.
 
 ## Requirements
 
- * Python 2.6 and above.
+ * Python 2.6 and above
  * [Requests](http://docs.python-requests.org/en/latest/) v1.1.0+
  * [python-dateutils](https://pypi.python.org/pypi?:action=display&name=python-dateutil)
  * An [App.net](http://app.net) developer account with an app already
@@ -59,7 +59,7 @@ $ python myclient.py
 
 Or, you may provide them directly to `Client`:
 
-```
+```python
 from appdotnet.api import Client
 client = Client(client_id='C5o2L8L4A9P1sE',
                 client_secret='2C3958H323221NDF_2938C341')
@@ -76,8 +76,8 @@ print 'App token (save this): %s' % token
 ```
 
 Once you have an app token, you aren't required to specify the client_id and
-client_secret when initializing an g. Methods added to the ADNClient in
-the future may require it, but for now that's not the case.
+client_secret when initializing a `Client`. Methods added to `Client` in the
+future may require it, but for now that's not the case.
 
 
 ### Creating a new stream
