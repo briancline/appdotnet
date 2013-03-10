@@ -22,6 +22,15 @@ And lo, the hacks were shameful, and were not to be spoken of or whatever.
    My Apps).
 
 
+## Installing
+
+Just install via `pip` thusly:
+
+```
+pip install appdotnet
+```
+
+
 ## Examples
 
 ### Generating an Application API Token (required for creating streams)
@@ -116,7 +125,7 @@ output.
 client = appdotnet.Client(app_token='mmgkuqRs0GdVVsfSkArm')
 test = client.stream_find('test')
 
-for event in c.stream(test['endpoint']):
+for event in client.stream(test['endpoint']):
     source = event.user_name('(unknown)')
     action = 'created' if not event.is_delete() else 'deleted'
     target = '%s %s' % (event.type(), event.id())
