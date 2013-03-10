@@ -15,6 +15,10 @@ def readme_contents(default=None):
 
 readme_file = 'README.md'
 description = 'A library for interacting with the App.net API.'
+long_description = "This is a module to interact with the App.net API. " \
+                   "It currently handles use cases requiring constant watch " \
+                   "the streaming API and detailed event interpolation."
+
 requires = ['requests',
             'python-dateutil']
 
@@ -22,7 +26,7 @@ setup(
     name='appdotnet',
     version='0.1.0',
     description=description,
-    long_description=readme_contents(default=description),
+    long_description=long_description,
     author='Brian Cline',
     author_email='bc@brian.fm',
     url='https://github.com/briancline/appdotnet',
