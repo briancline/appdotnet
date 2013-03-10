@@ -126,7 +126,7 @@ client = appdotnet.Client(app_token='mmgkuqRs0GdVVsfSkArm')
 test = client.stream_find('test')
 
 for event in client.stream(test['endpoint']):
-    source = event.user_name('(unknown)')
+    source = event.user_name() or '(unknown)'
     action = 'created' if not event.is_delete() else 'deleted'
     target = '%s %s' % (event.type(), event.id())
 
