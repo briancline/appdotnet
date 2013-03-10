@@ -30,9 +30,6 @@ setup(
 
     install_requires=requires,
     packages=find_packages(),
-    package_data={},
-    zip_safe=False,
-    entry_points={},
 
     classifiers=[
         'Environment :: Web Environment',
