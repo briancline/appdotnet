@@ -35,12 +35,42 @@ pip install appdotnet
 
 ## Examples
 
+### Specifying credentials
+
+Your app's client ID, client secret, and app token can all be specified when
+creating a `Client` instance. Alternatively, you may also define them in your
+environment, and they will be pulled in automatically. Specifying them as
+arguments to `Client` will override any environment variables.
+
+You can define these in your environment and provide no arguments to `Client`
+thusly:
+
+```python
+from appdotnet.api import Client
+client = Client()
+```
+
+```bash
+$ export ADN_CLIENT_ID="C5o2L8L4A9P1sE"
+$ export ADN_CLIENT_SECRET="2C3958H323221NDF_2938C341"
+$ export ADN_APP_TOKEN="mmgkuqRs0GdVVsfSkArm"
+$ python myclient.py
+```
+
+Or, you may provide them directly to `Client`:
+
+```
+from appdotnet.api import Client
+client = Client(client_id='C5o2L8L4A9P1sE',
+                client_secret='2C3958H323221NDF_2938C341')
+```
+
 ### Generating an Application API Token (required for creating streams)
 
 ```python
-import appdotnet
-client = appdotnet.Client(client_id='C5o2L8L4A9P1sE',
-                          client_secret='2C3958H323221NDF_2938C341')
+from appdotnet.api import Client
+client = Client(client_id='C5o2L8L4A9P1sE',
+                client_secret='2C3958H323221NDF_2938C341')
 token = client.create_app_token()
 print 'App token (save this): %s' % token
 ```
@@ -61,7 +91,7 @@ Creating a stream with a key name of "test", with a steady stream of post,
 star, and follow events, for instance, one could use the following:
 
 ```python
-client = appdotnet.Client(app_token='mmgkuqRs0GdVVsfSkArm')
+client = Client(app_token='mmgkuqRs0GdVVsfSkArm')
 stream = client.stream_create(key='test',
                               types=['post', 'star', 'user_follow'])
 print 'New stream ID is %s' % stream['id']
@@ -73,7 +103,7 @@ print 'New stream ID is %s' % stream['id']
 Need a full list of streams? `Client.stream_list()` will return a list of them.
 
 ```python
-client = appdotnet.Client(app_token='mmgkuqRs0GdVVsfSkArm')
+client = Client(app_token='mmgkuqRs0GdVVsfSkArm')
 streams = client.stream_list()
 print streams
 ```
@@ -95,7 +125,7 @@ Streams details be retrieved either by the numeric ID assigned to them, or by
 the key provided when the stream was created:
 
 ```python
-client = appdotnet.Client(app_token='mmgkuqRs0GdVVsfSkArm')
+client = Client(app_token='mmgkuqRs0GdVVsfSkArm')
 test = client.stream_find('test')
 ```
 
@@ -106,7 +136,7 @@ Streams must be deleted by providing the API-assigned ID to
 `Client.stream_delete`:
 
 ```python
-client = appdotnet.Client(app_token='mmgkuqRs0GdVVsfSkArm')
+client = Client(app_token='mmgkuqRs0GdVVsfSkArm')
 test = client.stream_find('test')
 
 if test and client.stream_delete(test['id']):
@@ -124,7 +154,7 @@ individual event. Each `Event` yield is produced from one line of Streaming API
 output.
 
 ```python
-client = appdotnet.Client(app_token='mmgkuqRs0GdVVsfSkArm')
+client = Client(app_token='mmgkuqRs0GdVVsfSkArm')
 test = client.stream_find('test')
 
 for event in client.stream(test['endpoint']):
