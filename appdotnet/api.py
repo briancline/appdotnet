@@ -9,7 +9,7 @@ import dateutil
 from exceptions import APIException, HTTPException
 from util import is_sequence
 
-USER_AGENT = 'appdotnet/0.1.0 (Python/%s)' % '.'.join([str(x) for x in
+USER_AGENT = 'appdotnet/0.1.1 (Python/%s)' % '.'.join([str(x) for x in
                                                        sys.version_info])
 
 
@@ -229,7 +229,7 @@ class Client(object):
 
         """
         key_or_id = str(key_or_id)
-        for stream in self.stream_list()['data']:
+        for stream in self.stream_list():
             if key_or_id in (stream.get('id', ''), stream.get('key', '')):
                 return stream
         return None
@@ -406,11 +406,11 @@ class Event(object):
 
     def reposted_user_id(self, default=None):
         """ Returns the reposted user's ID, or a default value. """
-        return self.repost_user({}).get('id', default)
+        return self.reposted_user({}).get('id', default)
 
     def reposted_user_name(self, default=None):
         """ Returns the reposted user's name, or a default value. """
-        return self.repost_user({}).get('username', default)
+        return self.reposted_user({}).get('username', default)
 
     def is_control(self):
         """ Returns True if the event is an API control message. """

@@ -181,6 +181,26 @@ for event in client.stream(test['endpoint']):
     print '%s -- %s %s %s' % (event.datetime(), source, action, target)
 ```
 
+Output from the above will look something like this:
+
+```
+2013-03-09 23:20:21.514000 -- magenta reposted thomasbrand's post 3693286 as post 3694981
+2013-03-09 23:20:27.805000 -- cjr created post 3694982
+2013-03-09 23:20:29.521000 -- (unknown) deleted post 3694981
+2013-03-09 23:26:58.630000 -- sheeter starred agiletortoise's post 3659543
+2013-03-09 23:30:13.377000 -- lvzhengcn reposted fredrica_fanfan's post 3695069 as post 3695112
+2013-03-09 23:30:16.033000 -- ham1975 deleted post 3694526
+2013-03-09 23:30:16.054000 -- ham1975 deleted post 3694432
+2013-03-09 23:30:16.507000 -- hailtothethief83 created post 3695113
+2013-03-09 23:30:17.620000 -- jmckinnon followed acarback
+2013-03-09 23:30:20.429000 -- nlsfrdrch followed hoaxilla
+2013-03-09 23:30:24.303000 -- yungsang created post 3695116
+2013-03-09 23:30:25.858000 -- mikeysalazar followed fr3d3ra1n
+2013-03-09 23:30:25.875000 -- fr3d3ra1n followed mikeysalazar
+2013-03-09 23:30:27.308000 -- craigkeller created post 3695117
+2013-03-09 23:30:28.873000 -- akr created post 3695118
+```
+
 
 ## Bugs and feedback
 
