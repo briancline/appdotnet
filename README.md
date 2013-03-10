@@ -17,6 +17,7 @@ And lo, the hacks were shameful, and were not to be spoken of or whatever.
 
  * Python 2.6 and above.
  * [Requests](http://docs.python-requests.org/en/latest/) v1.1.0+
+ * [python-dateutils](https://pypi.python.org/pypi?:action=display&name=python-dateutil)
  * An [App.net](http://app.net) developer account with an app already
    created and at least your Client ID and Client Secret (check My Account ->
    My Apps).
@@ -24,7 +25,8 @@ And lo, the hacks were shameful, and were not to be spoken of or whatever.
 
 ## Installing
 
-Just install via `pip` thusly:
+Just install via `pip` thusly, and the dependencies will be pulled down as
+well:
 
 ```
 pip install appdotnet
