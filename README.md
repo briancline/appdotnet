@@ -35,6 +35,10 @@ pip install appdotnet
 
 ## Examples
 
+[Full module documentation](http://briancline.github.com/appdotnet/appdotnet.html)
+as generated from docblocks is also available. See below for specific use case
+examples.
+
 ### Specifying credentials
 
 Your app's client ID, client secret, and app token can all be specified when
