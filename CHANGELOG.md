@@ -1,12 +1,18 @@
 # appdotnet Changes
 
+## 0.1.2-dev (2013-03-11)
+
+ * Changed mutable arg defaults in all instances with None, defaulting in the
+   body instead, due to Python's issue with mutable defaults.
+ * Add missing arg details in the _params docblock.
+
 ## 0.1.1 (2013-03-10)
 
  * Fix an index error in `Client.stream_list()`.
  * Fix an attribute error in `Event.reposted_user_name()` and
    `Event.reposted_user_id()`.
 
-## 0.1.0-dev (2013-03-08)
+## 0.1.0 (2013-03-09)
 
  * Implemented basic client object, streaming iterator, Event object, and
    convenience methods for the streaming API.

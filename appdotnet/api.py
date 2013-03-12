@@ -31,14 +31,17 @@ def _successful(response):
     return code in (200, 201, 202)
 
 
-def _params(in_params={}, collapse=False):
+def _params(param_dict=None, collapse=False):
     """ Given a dict of parameter key/value pairs, filter out the ones
     whose values are None, and comma-join any parameters with lists/tuples.
 
-    :param dict in_params: the full set of parameters
+    :param dict param_dict: the full set of parameters
+    :param boolean collapse: if True, collapses lists/tuples to comma-separated
+        lists
 
     """
-    params = dict(filter(lambda (k, v): v is not None, in_params.iteritems()))
+    param_dict = param_dict or {}
+    params = dict(filter(lambda (k, v): v is not None, param_dict.iteritems()))
 
     if collapse:
         for key in params:
@@ -234,13 +237,13 @@ class Client(object):
                 return stream
         return None
 
-    def stream_create(self, key=None, types=[], filter_id=None,
+    def stream_create(self, key=None, type_list=None, filter_id=None,
                       type='long_poll'):
         """ Creates a stream for the application token with the specified
         options.
 
         :param key: (optional) the key or name for this stream
-        :param list types: any combination of object types; see
+        :param list type_list: any combination of object types; see
             http://developers.app.net/docs/resources/stream/
             for a full list
         :param filter_id: (optional) an existing filter ID to apply to this
@@ -248,8 +251,9 @@ class Client(object):
         :param type: the stream type; currently long_poll is the only type
 
         """
+        type_list = type_list or []
         body = _params({'key': key,
-                        'object_types': types,
+                        'object_types': type_list,
                         'type': type,
                         'filter_id': filter_id})
         return self._request('streams.create', body=body)
