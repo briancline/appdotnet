@@ -1,10 +1,12 @@
 # appdotnet Changes
 
-## 0.1.2-dev (2013-03-11)
+## 0.1.2 (2013-03-11)
 
  * Changed mutable arg defaults in all instances with None, defaulting in the
    body instead, due to Python's issue with mutable defaults.
  * Add missing arg details in the _params docblock.
+ * Add :returns: directives in docblocks.
+ * Add Sphinx configuration.
 
 ## 0.1.1 (2013-03-10)
 

@@ -19,6 +19,7 @@ def _successful(response):
     'code' value, checks the HTTP response code instead.
 
     :param requests.Response response: a response object
+    :returns: (boolean) True if successful
 
     """
     code = response.status_code
@@ -38,6 +39,7 @@ def _params(param_dict=None, collapse=False):
     :param dict param_dict: the full set of parameters
     :param boolean collapse: if True, collapses lists/tuples to comma-separated
         lists
+    :returns: (dict) the refined set of params
 
     """
     param_dict = param_dict or {}
@@ -126,6 +128,7 @@ class Client(object):
 
         :param key: the endpoint key corresponding to an API method
         :param dict vars: key/value variable pairs in the URI to be substituted
+        :returns: (tuple) the HTTP verb and endpoint to use for the request
 
         """
         source = requests if clean else self.session
@@ -156,9 +159,10 @@ class Client(object):
             authentication headers)
         :param **kwargs: (optional) additional arguments to pass in to the
             requests method
+        :returns: (dict|string) the deserialized body, or the original body as
+            a str if it could not be deserialized
 
         """
-
         body = json.dumps(body) if body is not None else body
         method, endpoint = self._build_request(key, uri_vars=uri_vars,
                                                clean=clean)
@@ -176,8 +180,10 @@ class Client(object):
     def create_app_token(self):
         """ Creates an application access token. In order to request an
         application token, you must provide the client ID and client secret
-        when you initialize the client. """
+        when you initialize the client.
 
+        :returns: (string) the application access token
+        """
         if not self.client_id or not self.client_secret:
             raise Exception('client_id and client_secret must be provided to '
                             'create an app access token.')
@@ -200,6 +206,8 @@ class Client(object):
         :param stream_url: the stream endpoint URL
         :param boolean decode: whether to decode the JSON structure before
             yielding.
+        :returns: (appdotnet.api.Event) yields an Event instance for each
+            streaming API event received
 
         """
         resp = requests.get(stream_url, stream=True)
@@ -220,7 +228,10 @@ class Client(object):
             yield value
 
     def stream_list(self):
-        """ Get a list of streams for the application token. """
+        """ Get a list of streams for the application token.
+
+        :returns: (list) a list of stream dicts, or an empty list if none
+        """
 
         return self._request('streams.list').get('data', [])
 
@@ -229,6 +240,8 @@ class Client(object):
         parameter.
 
         :param string key_or_id: the key or ID to search for.
+        :returns: (dict|None) a dict representing the requested stream, or None
+            if it could not be found
 
         """
         key_or_id = str(key_or_id)
@@ -249,6 +262,7 @@ class Client(object):
         :param filter_id: (optional) an existing filter ID to apply to this
             stream
         :param type: the stream type; currently long_poll is the only type
+        :returns: (dict) the response as received from the API
 
         """
         type_list = type_list or []
@@ -262,6 +276,7 @@ class Client(object):
         """ Deletes a stream with the specified ID.
 
         :param integer id: the stream ID to delete
+        :returns: (boolean) True if the stream was successfully deleted
 
         """
         self._request('streams.delete', uri_vars={'stream_id': id})

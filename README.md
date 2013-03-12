@@ -10,7 +10,7 @@ This code comes from a library that's been in use privately for some time now.
 I'm systematically adding more to this library as I get more of the original
 hacked-up code cleaned up for public consumption (and documented).
 
-And lo, the hacks were shameful, and were not to be spoken of or whatever.
+And lo, the hacks were shameful, and were not to be spoken of, or whatever.
 
 
 ## Requirements
