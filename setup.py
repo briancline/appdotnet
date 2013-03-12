@@ -24,7 +24,7 @@ requires = ['requests',
 
 setup(
     name='appdotnet',
-    version='0.1.1',
+    version='0.1.2',
     description=description,
     long_description=long_description,
     author='Brian Cline',

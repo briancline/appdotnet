@@ -9,7 +9,7 @@ import dateutil
 from exceptions import APIException, HTTPException
 from util import is_sequence
 
-USER_AGENT = 'appdotnet/0.1.1 (Python/%s)' % '.'.join([str(x) for x in
+USER_AGENT = 'appdotnet/0.1.2 (Python/%s)' % '.'.join([str(x) for x in
                                                        sys.version_info])
 
 
