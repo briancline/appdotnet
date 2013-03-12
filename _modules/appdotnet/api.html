@@ -1,0 +1,578 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>appdotnet.api &mdash; appdotnet 0.1.2 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1.2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="appdotnet 0.1.2 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">appdotnet 0.1.2 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for appdotnet.api</h1><div class="highlight"><pre>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">print_function</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">requests</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">endpoints</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">import</span> <span class="nn">dateutil</span>
+<span class="kn">from</span> <span class="nn">exceptions</span> <span class="kn">import</span> <span class="n">APIException</span><span class="p">,</span> <span class="n">HTTPException</span>
+<span class="kn">from</span> <span class="nn">util</span> <span class="kn">import</span> <span class="n">is_sequence</span>
+
+<span class="n">USER_AGENT</span> <span class="o">=</span> <span class="s">&#39;appdotnet/0.1.2 (Python/</span><span class="si">%s</span><span class="s">)&#39;</span> <span class="o">%</span> <span class="s">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span>
+                                                       <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">])</span>
+
+
+<span class="k">def</span> <span class="nf">_successful</span><span class="p">(</span><span class="n">response</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Returns whether a response was considered successful. If no body is</span>
+<span class="sd">    available or the &#39;meta&#39; dict in the response envelope doesn&#39;t contain a</span>
+<span class="sd">    &#39;code&#39; value, checks the HTTP response code instead.</span>
+
+<span class="sd">    :param requests.Response response: a response object</span>
+<span class="sd">    :returns: (boolean) True if successful</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">code</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">code</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s">&#39;meta&#39;</span><span class="p">][</span><span class="s">&#39;code&#39;</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="k">return</span> <span class="n">code</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="mi">201</span><span class="p">,</span> <span class="mi">202</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_params</span><span class="p">(</span><span class="n">param_dict</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">collapse</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Given a dict of parameter key/value pairs, filter out the ones</span>
+<span class="sd">    whose values are None, and comma-join any parameters with lists/tuples.</span>
+
+<span class="sd">    :param dict param_dict: the full set of parameters</span>
+<span class="sd">    :param boolean collapse: if True, collapses lists/tuples to comma-separated</span>
+<span class="sd">        lists</span>
+<span class="sd">    :returns: (dict) the refined set of params</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">param_dict</span> <span class="o">=</span> <span class="n">param_dict</span> <span class="ow">or</span> <span class="p">{}</span>
+    <span class="n">params</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">):</span> <span class="n">v</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">,</span> <span class="n">param_dict</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()))</span>
+
+    <span class="k">if</span> <span class="n">collapse</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">params</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">is_sequence</span><span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="n">key</span><span class="p">]):</span>
+                <span class="n">params</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">params</span>
+
+
+<span class="k">def</span> <span class="nf">_raise_errors</span><span class="p">(</span><span class="n">response</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Checks the requests.Response object body for any API-level errors, then</span>
+<span class="sd">    checks whether we received a 4xx- or 5xx-level response code. Raises an</span>
+<span class="sd">    exception for any undesirables. &quot;&quot;&quot;</span>
+
+    <span class="n">api_error</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="n">http_error</span> <span class="o">=</span> <span class="mi">400</span> <span class="o">&lt;=</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">body</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+        <span class="n">api_error</span> <span class="o">=</span> <span class="p">(</span><span class="n">body</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;error&#39;</span><span class="p">,</span> <span class="bp">False</span><span class="p">)</span> <span class="ow">or</span>
+                     <span class="n">body</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;meta&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;error_message&#39;</span><span class="p">))</span>
+    <span class="k">except</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="k">if</span> <span class="n">api_error</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">APIException</span><span class="p">(</span><span class="n">api_error</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">http_error</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">HTTPException</span><span class="p">(</span><span class="s">&quot;HTTP </span><span class="si">%d</span><span class="s">: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">status_code</span><span class="p">,</span>
+                                             <span class="n">response</span><span class="o">.</span><span class="n">text</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="Client"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Client">[docs]</a><span class="k">class</span> <span class="nc">Client</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; An App.net client object. &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">client_id</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">client_secret</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">app_token</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>
+                 <span class="n">user_token</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Initialize an API client with the provided credentials.</span>
+
+<span class="sd">        :param client_id: (optional) the application&#39;s Client ID</span>
+<span class="sd">        :param client_secret: (optional) the application&#39;s Client Secret</span>
+<span class="sd">        :param app_token: (optional) an application-level token as generated by</span>
+<span class="sd">            https://account.app.net/oauth/access_token</span>
+<span class="sd">        :param user_token: (optional) a user-level token</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">client_id</span> <span class="o">=</span> <span class="n">client_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">client_secret</span> <span class="o">=</span> <span class="n">client_secret</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">app_token</span> <span class="o">=</span> <span class="n">app_token</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">user_token</span> <span class="o">=</span> <span class="n">user_token</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_load_env_credentials</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">session</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_build_headers</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_load_env_credentials</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Attempt to load client ID, secret, app token, and user token from</span>
+<span class="sd">        the environment if not explicitly passed in to the class. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_id</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">client_id</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;ADN_CLIENT_ID&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_secret</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">client_secret</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;ADN_CLIENT_SECRET&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">app_token</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">app_token</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;ADN_APP_TOKEN&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_token</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">user_token</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;ADN_USER_TOKEN&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_build_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Builds the basic set of headers for the session. &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s">&#39;User-Agent&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">USER_AGENT</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s">&#39;Content-Type&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;application/json&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s">&#39;Accept&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;application/json&#39;</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">app_token</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s">&#39;Authorization&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;BEARER &#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">app_token</span>
+
+    <span class="k">def</span> <span class="nf">_build_request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">uri_vars</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">clean</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Locate the appropriate endpoint URI and HTTP VERB for the specified</span>
+<span class="sd">        request key, and return a tuple containing the callable from our</span>
+<span class="sd">        Session corresponding to that verb, and the full endpoint URL.</span>
+
+<span class="sd">        :param key: the endpoint key corresponding to an API method</span>
+<span class="sd">        :param dict vars: key/value variable pairs in the URI to be substituted</span>
+<span class="sd">        :returns: (tuple) the HTTP verb and endpoint to use for the request</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="n">requests</span> <span class="k">if</span> <span class="n">clean</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span>
+        <span class="n">verb</span><span class="p">,</span> <span class="n">endpoint</span> <span class="o">=</span> <span class="n">endpoints</span><span class="o">.</span><span class="n">find_method</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="nb">vars</span><span class="o">=</span><span class="n">uri_vars</span><span class="p">)</span>
+        <span class="n">verb</span> <span class="o">=</span> <span class="n">verb</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">verb</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s">&#39;Cannot find verb method </span><span class="si">%s</span><span class="s"> in requests!&#39;</span> <span class="o">%</span> <span class="n">verb</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">verb</span><span class="p">),</span> <span class="n">endpoint</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">uri_vars</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">clean</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span>
+                 <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Issue a request for the endpoint key, substituting in the URL any</span>
+<span class="sd">        variables provided in `vars`, including any query string or body</span>
+<span class="sd">        parameters in `params`, and optionally with no authentication</span>
+<span class="sd">        information if `clean` is True.</span>
+
+<span class="sd">        :param key: the endpoint key corresponding to an API method</span>
+<span class="sd">        :param dict uri_vars: (optional) key/value variable pairs to substitute</span>
+<span class="sd">            in the URI</span>
+<span class="sd">        :param dict params: (optional) key/value parameters to include in the</span>
+<span class="sd">            query string on requests or on POSTs where no other body is</span>
+<span class="sd">            specified</span>
+<span class="sd">        :param body: (optional) a JSON-serializable value to use as the body of</span>
+<span class="sd">            a POST or PUT request</span>
+<span class="sd">        :param boolean clean: (optional) if True, use a clean request (e.g., no</span>
+<span class="sd">            authentication headers)</span>
+<span class="sd">        :param **kwargs: (optional) additional arguments to pass in to the</span>
+<span class="sd">            requests method</span>
+<span class="sd">        :returns: (dict|string) the deserialized body, or the original body as</span>
+<span class="sd">            a str if it could not be deserialized</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">body</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">body</span><span class="p">)</span> <span class="k">if</span> <span class="n">body</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="k">else</span> <span class="n">body</span>
+        <span class="n">method</span><span class="p">,</span> <span class="n">endpoint</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_request</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">uri_vars</span><span class="o">=</span><span class="n">uri_vars</span><span class="p">,</span>
+                                               <span class="n">clean</span><span class="o">=</span><span class="n">clean</span><span class="p">)</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">method</span><span class="p">(</span><span class="n">endpoint</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">body</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">_raise_errors</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+
+        <span class="n">body</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">text</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">body</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+        <span class="k">except</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+        <span class="k">return</span> <span class="n">body</span>
+
+<div class="viewcode-block" id="Client.create_app_token"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Client.create_app_token">[docs]</a>    <span class="k">def</span> <span class="nf">create_app_token</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Creates an application access token. In order to request an</span>
+<span class="sd">        application token, you must provide the client ID and client secret</span>
+<span class="sd">        when you initialize the client.</span>
+
+<span class="sd">        :returns: (string) the application access token</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_id</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_secret</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s">&#39;client_id and client_secret must be provided to &#39;</span>
+                            <span class="s">&#39;create an app access token.&#39;</span><span class="p">)</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;client_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_id</span><span class="p">,</span>
+                <span class="s">&#39;client_secret&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">client_secret</span><span class="p">,</span>
+                <span class="s">&#39;grant_type&#39;</span><span class="p">:</span> <span class="s">&#39;client_credentials&#39;</span><span class="p">}</span>
+
+        <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s">&#39;oauth.token.create&#39;</span><span class="p">,</span> <span class="n">clean</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">body</span><span class="p">[</span><span class="s">&#39;access_token&#39;</span><span class="p">]</span>
+</div>
+<div class="viewcode-block" id="Client.stream"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Client.stream">[docs]</a>    <span class="k">def</span> <span class="nf">stream</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream_url</span><span class="p">,</span> <span class="n">decode</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; A generator used to iterate over events received via the streaming</span>
+<span class="sd">        API. Automatic JSON decoding is the default behavior but can be</span>
+<span class="sd">        disabled.</span>
+
+<span class="sd">        Yields an Event instance for each line received via the API. If</span>
+<span class="sd">        decoding is off, yields a string of the raw line received.</span>
+
+<span class="sd">        :param stream_url: the stream endpoint URL</span>
+<span class="sd">        :param boolean decode: whether to decode the JSON structure before</span>
+<span class="sd">            yielding.</span>
+<span class="sd">        :returns: (appdotnet.api.Event) yields an Event instance for each</span>
+<span class="sd">            streaming API event received</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">resp</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stream_url</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">resp</span><span class="o">.</span><span class="n">iter_lines</span><span class="p">(</span><span class="n">chunk_size</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">value</span> <span class="o">=</span> <span class="bp">None</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">decode</span><span class="p">:</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="n">line</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="n">Event</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">line</span><span class="p">))</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+                    <span class="k">print</span><span class="p">(</span><span class="s">&#39;Cannot decode line: </span><span class="si">%s</span><span class="s"> (</span><span class="si">%s</span><span class="s">)&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">line</span><span class="p">))</span>
+
+            <span class="k">yield</span> <span class="n">value</span>
+</div>
+<div class="viewcode-block" id="Client.stream_list"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Client.stream_list">[docs]</a>    <span class="k">def</span> <span class="nf">stream_list</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Get a list of streams for the application token.</span>
+
+<span class="sd">        :returns: (list) a list of stream dicts, or an empty list if none</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s">&#39;streams.list&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;data&#39;</span><span class="p">,</span> <span class="p">[])</span>
+</div>
+<div class="viewcode-block" id="Client.stream_find"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Client.stream_find">[docs]</a>    <span class="k">def</span> <span class="nf">stream_find</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key_or_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Find a specific stream whose key or ID matches the key_or_id</span>
+<span class="sd">        parameter.</span>
+
+<span class="sd">        :param string key_or_id: the key or ID to search for.</span>
+<span class="sd">        :returns: (dict|None) a dict representing the requested stream, or None</span>
+<span class="sd">            if it could not be found</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">key_or_id</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">key_or_id</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">stream</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">stream_list</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">key_or_id</span> <span class="ow">in</span> <span class="p">(</span><span class="n">stream</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;id&#39;</span><span class="p">,</span> <span class="s">&#39;&#39;</span><span class="p">),</span> <span class="n">stream</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;key&#39;</span><span class="p">,</span> <span class="s">&#39;&#39;</span><span class="p">)):</span>
+                <span class="k">return</span> <span class="n">stream</span>
+        <span class="k">return</span> <span class="bp">None</span>
+</div>
+<div class="viewcode-block" id="Client.stream_create"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Client.stream_create">[docs]</a>    <span class="k">def</span> <span class="nf">stream_create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">type_list</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">filter_id</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>
+                      <span class="nb">type</span><span class="o">=</span><span class="s">&#39;long_poll&#39;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Creates a stream for the application token with the specified</span>
+<span class="sd">        options.</span>
+
+<span class="sd">        :param key: (optional) the key or name for this stream</span>
+<span class="sd">        :param list type_list: any combination of object types; see</span>
+<span class="sd">            http://developers.app.net/docs/resources/stream/</span>
+<span class="sd">            for a full list</span>
+<span class="sd">        :param filter_id: (optional) an existing filter ID to apply to this</span>
+<span class="sd">            stream</span>
+<span class="sd">        :param type: the stream type; currently long_poll is the only type</span>
+<span class="sd">        :returns: (dict) the response as received from the API</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">type_list</span> <span class="o">=</span> <span class="n">type_list</span> <span class="ow">or</span> <span class="p">[]</span>
+        <span class="n">body</span> <span class="o">=</span> <span class="n">_params</span><span class="p">({</span><span class="s">&#39;key&#39;</span><span class="p">:</span> <span class="n">key</span><span class="p">,</span>
+                        <span class="s">&#39;object_types&#39;</span><span class="p">:</span> <span class="n">type_list</span><span class="p">,</span>
+                        <span class="s">&#39;type&#39;</span><span class="p">:</span> <span class="nb">type</span><span class="p">,</span>
+                        <span class="s">&#39;filter_id&#39;</span><span class="p">:</span> <span class="n">filter_id</span><span class="p">})</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s">&#39;streams.create&#39;</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Client.stream_delete"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Client.stream_delete">[docs]</a>    <span class="k">def</span> <span class="nf">stream_delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Deletes a stream with the specified ID.</span>
+
+<span class="sd">        :param integer id: the stream ID to delete</span>
+<span class="sd">        :returns: (boolean) True if the stream was successfully deleted</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s">&#39;streams.delete&#39;</span><span class="p">,</span> <span class="n">uri_vars</span><span class="o">=</span><span class="p">{</span><span class="s">&#39;stream_id&#39;</span><span class="p">:</span> <span class="nb">id</span><span class="p">})</span>
+        <span class="k">return</span> <span class="bp">True</span>
+
+</div></div>
+<div class="viewcode-block" id="Event"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event">[docs]</a><span class="k">class</span> <span class="nc">Event</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Represents a streaming API event. &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Accepts a dict called `event` and provides a positively terrific</span>
+<span class="sd">        variety of convenience methods to interpret various things about it.</span>
+
+<span class="sd">        :param dict event: the original JSON-decoded entity</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_event</span> <span class="o">=</span> <span class="n">event</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_meta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;meta&#39;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;data&#39;</span><span class="p">,</span> <span class="p">{})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;type&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__hasattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__contains__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+<div class="viewcode-block" id="Event.type"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.type">[docs]</a>    <span class="k">def</span> <span class="nf">type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Original meta type of this event. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span>
+</div>
+<div class="viewcode-block" id="Event.meta"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.meta">[docs]</a>    <span class="k">def</span> <span class="nf">meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns a value from the meta dict or a default value if the key</span>
+<span class="sd">        was not present.</span>
+
+<span class="sd">        :param key: a dict key from the original meta dict</span>
+<span class="sd">        :param default: (optional) a default value to return if the key does</span>
+<span class="sd">            not exist</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.data"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.data">[docs]</a>    <span class="k">def</span> <span class="nf">data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns a value from the data dict or a default value if the key</span>
+<span class="sd">        was not present.</span>
+
+<span class="sd">        :param key: a dict key from the original data dict</span>
+<span class="sd">        :param default: (optional) a default value to return if the key does</span>
+<span class="sd">            not exist</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+</div>
+    <span class="k">def</span> <span class="nf">_data_entity_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the `id` value of the specified key in the data dict, or a</span>
+<span class="sd">        default value if the key was not present.</span>
+
+<span class="sd">        :param key: a dict key from the original data dict</span>
+<span class="sd">        :param default: (optional) a default value to return if the key does</span>
+<span class="sd">            not exist</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;id&#39;</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Event.id"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.id">[docs]</a>    <span class="k">def</span> <span class="nf">id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the ID of the meta payload, if present. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;id&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.timestamp"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.timestamp">[docs]</a>    <span class="k">def</span> <span class="nf">timestamp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the timestamp portion of the meta payload, if present. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;timestamp&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="o">/</span> <span class="mi">1000</span>
+</div>
+<div class="viewcode-block" id="Event.datetime"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.datetime">[docs]</a>    <span class="k">def</span> <span class="nf">datetime</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns a datetime object of the `timestamp` value in the meta</span>
+<span class="sd">        payload, if present. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">datetime</span><span class="o">.</span><span class="n">fromtimestamp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">timestamp</span><span class="p">())</span>
+</div>
+<div class="viewcode-block" id="Event.create_date"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.create_date">[docs]</a>    <span class="k">def</span> <span class="nf">create_date</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns a datetime object of the `created_at` item in the data</span>
+<span class="sd">        payload, if present. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">dateutil</span><span class="o">.</span><span class="n">parser</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;created_at&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">))</span>
+</div>
+<div class="viewcode-block" id="Event.user"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.user">[docs]</a>    <span class="k">def</span> <span class="nf">user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the user dict from the data dict, or a default value. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;user&#39;</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.user_id"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.user_id">[docs]</a>    <span class="k">def</span> <span class="nf">user_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the user id from the data dict, or a default value. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data_entity_id</span><span class="p">(</span><span class="s">&#39;user&#39;</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.user_name"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.user_name">[docs]</a>    <span class="k">def</span> <span class="nf">user_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the user name from the data dict, or a default value. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="p">({})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;username&#39;</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.followed_user"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.followed_user">[docs]</a>    <span class="k">def</span> <span class="nf">followed_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the followed user from the data dict, or a default value.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;follows_user&#39;</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.followed_user_id"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.followed_user_id">[docs]</a>    <span class="k">def</span> <span class="nf">followed_user_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the followed user id from the data dict, or a default</span>
+<span class="sd">        value. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data_entity_id</span><span class="p">(</span><span class="s">&#39;follows_user&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.followed_user_name"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.followed_user_name">[docs]</a>    <span class="k">def</span> <span class="nf">followed_user_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the followed user name from the data dict, or a default</span>
+<span class="sd">        value. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">followed_user</span><span class="p">({})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;username&#39;</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.post_id"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.post_id">[docs]</a>    <span class="k">def</span> <span class="nf">post_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the post ID specified as the &#39;post&#39; target in the data</span>
+<span class="sd">        dict, or a default value. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data_entity_id</span><span class="p">(</span><span class="s">&#39;post&#39;</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.post_user"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.post_user">[docs]</a>    <span class="k">def</span> <span class="nf">post_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the user dict on the &#39;post&#39; target in the data dict, or a</span>
+<span class="sd">        default value. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;post&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;user&#39;</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.post_user_id"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.post_user_id">[docs]</a>    <span class="k">def</span> <span class="nf">post_user_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the user id on the &#39;post&#39; target in the data dict, or a</span>
+<span class="sd">        default value. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">post_user</span><span class="p">({})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;id&#39;</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.post_user_name"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.post_user_name">[docs]</a>    <span class="k">def</span> <span class="nf">post_user_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the user name on the &#39;post&#39; target in the data dict, or a</span>
+<span class="sd">        default value. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">post_user</span><span class="p">({})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;username&#39;</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.reposted_id"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.reposted_id">[docs]</a>    <span class="k">def</span> <span class="nf">reposted_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the reposted post ID, or a default value. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data_entity_id</span><span class="p">(</span><span class="s">&#39;repost_of&#39;</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.reposted_user"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.reposted_user">[docs]</a>    <span class="k">def</span> <span class="nf">reposted_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the reposted user dict, or a default value. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;repost_of&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;user&#39;</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.reposted_user_id"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.reposted_user_id">[docs]</a>    <span class="k">def</span> <span class="nf">reposted_user_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the reposted user&#39;s ID, or a default value. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">reposted_user</span><span class="p">({})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;id&#39;</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.reposted_user_name"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.reposted_user_name">[docs]</a>    <span class="k">def</span> <span class="nf">reposted_user_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the reposted user&#39;s name, or a default value. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">reposted_user</span><span class="p">({})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;username&#39;</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.is_control"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.is_control">[docs]</a>    <span class="k">def</span> <span class="nf">is_control</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns True if the event is an API control message. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">==</span> <span class="s">&#39;control&#39;</span>
+</div>
+<div class="viewcode-block" id="Event.is_delete"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.is_delete">[docs]</a>    <span class="k">def</span> <span class="nf">is_delete</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns True if the event is a deletion. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;is_deleted&#39;</span><span class="p">,</span> <span class="bp">False</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.is_post_type"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.is_post_type">[docs]</a>    <span class="k">def</span> <span class="nf">is_post_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns True if the meta type is `post`. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">==</span> <span class="s">&#39;post&#39;</span>
+</div>
+<div class="viewcode-block" id="Event.is_post"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.is_post">[docs]</a>    <span class="k">def</span> <span class="nf">is_post</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns True if the event is a new post. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">is_post_type</span><span class="p">()</span> <span class="ow">and</span>
+                <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_delete</span><span class="p">()</span> <span class="ow">and</span>
+                <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_repost</span><span class="p">())</span>
+</div>
+<div class="viewcode-block" id="Event.is_repost"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.is_repost">[docs]</a>    <span class="k">def</span> <span class="nf">is_repost</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns True if the event is a new repost. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">is_post_type</span><span class="p">()</span> <span class="ow">and</span>
+                <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_delete</span><span class="p">()</span> <span class="ow">and</span>
+                <span class="s">&#39;repost_of&#39;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Event.is_post_delete"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.is_post_delete">[docs]</a>    <span class="k">def</span> <span class="nf">is_post_delete</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns True if the event is a post deletion. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">is_post_type</span><span class="p">()</span> <span class="ow">and</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">is_delete</span><span class="p">())</span>
+</div>
+<div class="viewcode-block" id="Event.is_follow_type"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.is_follow_type">[docs]</a>    <span class="k">def</span> <span class="nf">is_follow_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns True if the meta type is `user_follow`. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">==</span> <span class="s">&#39;user_follow&#39;</span>
+</div>
+<div class="viewcode-block" id="Event.is_follow"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.is_follow">[docs]</a>    <span class="k">def</span> <span class="nf">is_follow</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns True if the event is a follow event. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_follow_type</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_delete</span><span class="p">()</span>
+</div>
+<div class="viewcode-block" id="Event.is_unfollow"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.is_unfollow">[docs]</a>    <span class="k">def</span> <span class="nf">is_unfollow</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns True if the event is an unfollow event. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_follow_type</span><span class="p">()</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_delete</span><span class="p">()</span>
+</div>
+<div class="viewcode-block" id="Event.is_star_type"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.is_star_type">[docs]</a>    <span class="k">def</span> <span class="nf">is_star_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns True if the meta type is `star`. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">==</span> <span class="s">&#39;star&#39;</span>
+</div>
+<div class="viewcode-block" id="Event.is_star"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.is_star">[docs]</a>    <span class="k">def</span> <span class="nf">is_star</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns True if the event is a star event. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_star_type</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_delete</span><span class="p">()</span>
+</div>
+<div class="viewcode-block" id="Event.is_unstar"><a class="viewcode-back" href="../../appdotnet.html#appdotnet.api.Event.is_unstar">[docs]</a>    <span class="k">def</span> <span class="nf">is_unstar</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns True if the event is an un-star event. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_star_type</span><span class="p">()</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_delete</span><span class="p">()</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">appdotnet 0.1.2 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Brian Cline.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>
