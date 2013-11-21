@@ -9,7 +9,7 @@ import dateutil
 from exceptions import APIException, HTTPException
 from util import is_sequence
 
-USER_AGENT = 'appdotnet/0.1.2 (Python/%s)' % '.'.join([str(x) for x in
+USER_AGENT = 'appdotnet/0.1.3 (Python/%s)' % '.'.join([str(x) for x in
                                                        sys.version_info])
 
 
@@ -65,7 +65,7 @@ def _raise_errors(response):
         body = response.json()
         api_error = (body.get('error', False) or
                      body.get('meta', {}).get('error_message'))
-    except:
+    except Exception:
         pass
 
     if api_error:
@@ -132,7 +132,7 @@ class Client(object):
 
         """
         source = requests if clean else self.session
-        verb, endpoint = endpoints.find_method(key, vars=uri_vars)
+        verb, endpoint = endpoints.find_method(key, uri_vars=uri_vars)
         verb = verb.lower()
 
         if not hasattr(source, verb):
@@ -172,7 +172,7 @@ class Client(object):
         body = response.text
         try:
             body = response.json()
-        except:
+        except Exception:
             pass
 
         return body
@@ -251,7 +251,7 @@ class Client(object):
         return None
 
     def stream_create(self, key=None, type_list=None, filter_id=None,
-                      type='long_poll'):
+                      stream_type='long_poll'):
         """ Creates a stream for the application token with the specified
         options.
 
@@ -261,25 +261,26 @@ class Client(object):
             for a full list
         :param filter_id: (optional) an existing filter ID to apply to this
             stream
-        :param type: the stream type; currently long_poll is the only type
+        :param stream_type: the stream type; currently long_poll is the only
+            type
         :returns: (dict) the response as received from the API
 
         """
         type_list = type_list or []
         body = _params({'key': key,
                         'object_types': type_list,
-                        'type': type,
+                        'type': stream_type,
                         'filter_id': filter_id})
         return self._request('streams.create', body=body)
 
-    def stream_delete(self, id):
+    def stream_delete(self, stream_id):
         """ Deletes a stream with the specified ID.
 
         :param integer id: the stream ID to delete
         :returns: (boolean) True if the stream was successfully deleted
 
         """
-        self._request('streams.delete', uri_vars={'stream_id': id})
+        self._request('streams.delete', uri_vars={'stream_id': stream_id})
         return True
 
 
@@ -388,7 +389,7 @@ class Event(object):
     def followed_user_id(self, default=None):
         """ Returns the followed user id from the data dict, or a default
         value. """
-        return self._data_entity_id('follows_user', None)
+        return self._data_entity_id('follows_user', default)
 
     def followed_user_name(self, default=None):
         """ Returns the followed user name from the data dict, or a default

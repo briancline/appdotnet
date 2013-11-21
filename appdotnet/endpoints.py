@@ -9,14 +9,14 @@ BASE_URL = 'https://alpha-api.app.net'
 ACCOUNT_BASE_URL = 'https://account.app.net'
 
 
-def find_method(key, vars=None):
+def find_method(key, uri_vars=None):
     """ Given a method key, returns a tuple containing the HTTP verb and the
     full API endpoint for that particular method. If any vars are passed in,
     they are substituted out in the URL with the values provided.
 
     :param key: the API method key
-    :param dict vars: (optional) a dict containing any variables to substitute
-        out in the endpoint URI
+    :param dict uri_vars: (optional) a dict containing any variables to
+        substitute out in the endpoint URI
     :returns: (tuple) HTTP verb and full API endpoint URL
 
     """
@@ -25,9 +25,9 @@ def find_method(key, vars=None):
 
     (verb, uri) = method_map[key]
 
-    if vars is not None:
-        print vars
-        uri = uri.format(**vars)
+    if uri_vars is not None:
+        print uri_vars
+        uri = uri.format(**uri_vars)
     if uri[0] == '/':
         uri = BASE_URL + uri
 
