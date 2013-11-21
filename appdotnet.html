@@ -7,7 +7,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>appdotnet Package &mdash; appdotnet 0.1.2 documentation</title>
+    <title>appdotnet Package &mdash; appdotnet 0.1.3 documentation</title>
     
     <link rel="stylesheet" href="_static/nature.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -15,7 +15,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '',
-        VERSION:     '0.1.2',
+        VERSION:     '0.1.3',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -24,7 +24,7 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="appdotnet 0.1.2 documentation" href="index.html" />
+    <link rel="top" title="appdotnet 0.1.3 documentation" href="index.html" />
     <link rel="prev" title="appdotnet Package Documentation" href="index.html" /> 
   </head>
   <body>
@@ -40,7 +40,7 @@
         <li class="right" >
           <a href="index.html" title="appdotnet Package Documentation"
              accesskey="P">previous</a> |</li>
-        <li><a href="index.html">appdotnet 0.1.2 documentation</a> &raquo;</li> 
+        <li><a href="index.html">appdotnet 0.1.3 documentation</a> &raquo;</li> 
       </ul>
     </div>  
 
@@ -118,7 +118,7 @@ streaming API event received</p>
 
 <dl class="method">
 <dt id="appdotnet.api.Client.stream_create">
-<tt class="descname">stream_create</tt><big>(</big><em>key=None</em>, <em>type_list=None</em>, <em>filter_id=None</em>, <em>type='long_poll'</em><big>)</big><a class="reference internal" href="_modules/appdotnet/api.html#Client.stream_create"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#appdotnet.api.Client.stream_create" title="Permalink to this definition">¶</a></dt>
+<tt class="descname">stream_create</tt><big>(</big><em>key=None</em>, <em>type_list=None</em>, <em>filter_id=None</em>, <em>stream_type='long_poll'</em><big>)</big><a class="reference internal" href="_modules/appdotnet/api.html#Client.stream_create"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#appdotnet.api.Client.stream_create" title="Permalink to this definition">¶</a></dt>
 <dd><p>Creates a stream for the application token with the specified
 options.</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -132,7 +132,8 @@ options.</p>
 for a full list</li>
 <li><strong>filter_id</strong> &#8211; (optional) an existing filter ID to apply to this
 stream</li>
-<li><strong>type</strong> &#8211; the stream type; currently long_poll is the only type</li>
+<li><strong>stream_type</strong> &#8211; the stream type; currently long_poll is the only
+type</li>
 </ul>
 </td>
 </tr>
@@ -145,7 +146,7 @@ stream</li>
 
 <dl class="method">
 <dt id="appdotnet.api.Client.stream_delete">
-<tt class="descname">stream_delete</tt><big>(</big><em>id</em><big>)</big><a class="reference internal" href="_modules/appdotnet/api.html#Client.stream_delete"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#appdotnet.api.Client.stream_delete" title="Permalink to this definition">¶</a></dt>
+<tt class="descname">stream_delete</tt><big>(</big><em>stream_id</em><big>)</big><a class="reference internal" href="_modules/appdotnet/api.html#Client.stream_delete"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#appdotnet.api.Client.stream_delete" title="Permalink to this definition">¶</a></dt>
 <dd><p>Deletes a stream with the specified ID.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -448,7 +449,7 @@ default value.</p>
 <span id="endpoints-module"></span><h2><tt class="xref py py-mod docutils literal"><span class="pre">endpoints</span></tt> Module<a class="headerlink" href="#module-appdotnet.endpoints" title="Permalink to this headline">¶</a></h2>
 <dl class="function">
 <dt id="appdotnet.endpoints.find_method">
-<tt class="descclassname">appdotnet.endpoints.</tt><tt class="descname">find_method</tt><big>(</big><em>key</em>, <em>vars=None</em><big>)</big><a class="reference internal" href="_modules/appdotnet/endpoints.html#find_method"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#appdotnet.endpoints.find_method" title="Permalink to this definition">¶</a></dt>
+<tt class="descclassname">appdotnet.endpoints.</tt><tt class="descname">find_method</tt><big>(</big><em>key</em>, <em>uri_vars=None</em><big>)</big><a class="reference internal" href="_modules/appdotnet/endpoints.html#find_method"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#appdotnet.endpoints.find_method" title="Permalink to this definition">¶</a></dt>
 <dd><p>Given a method key, returns a tuple containing the HTTP verb and the
 full API endpoint for that particular method. If any vars are passed in,
 they are substituted out in the URL with the values provided.</p>
@@ -458,8 +459,8 @@ they are substituted out in the URL with the values provided.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
 <li><strong>key</strong> &#8211; the API method key</li>
-<li><strong>vars</strong> (<em>dict</em>) &#8211; (optional) a dict containing any variables to substitute
-out in the endpoint URI</li>
+<li><strong>uri_vars</strong> (<em>dict</em>) &#8211; (optional) a dict containing any variables to
+substitute out in the endpoint URI</li>
 </ul>
 </td>
 </tr>
@@ -564,7 +565,7 @@ out in the endpoint URI</li>
         <li class="right" >
           <a href="index.html" title="appdotnet Package Documentation"
              >previous</a> |</li>
-        <li><a href="index.html">appdotnet 0.1.2 documentation</a> &raquo;</li> 
+        <li><a href="index.html">appdotnet 0.1.3 documentation</a> &raquo;</li> 
       </ul>
     </div>
     <div class="footer">
